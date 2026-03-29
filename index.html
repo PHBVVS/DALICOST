@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>個人理財管家 - Dalicost</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background-color: #fcfaff; 
+            color: #2e1065; 
+            overflow-x: hidden;
+        }
+        
+        /* 視覺裝飾與陰影 */
+        .clean-shadow { box-shadow: 0 4px 12px -2px rgba(139, 92, 246, 0.08), 0 2px 6px -2px rgba(139, 92, 246, 0.04); }
+        .deep-shadow { box-shadow: 0 20px 25px -5px rgba(139, 92, 246, 0.1), 0 10px 10px -5px rgba(139, 92, 246, 0.04); }
+        
+        /* 按鈕樣式 */
+        .btn-violet { 
+            background-color: #7c3aed;
+            color: #ffffff; 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-violet:hover { background-color: #6d28d9; transform: translateY(-1px); }
+        .btn-violet:active { transform: translateY(0); }
+        
+        .btn-outline { 
+            border: 1px solid #ddd6fe; 
+            background-color: #ffffff; 
+            color: #7c3aed; 
+            transition: all 0.2s; 
+        }
+        .btn-active { 
+            background-color: #7c3aed !important; 
+            color: #ffffff !important; 
+            border-color: #7c3aed !important;
+        }
+        
+        .btn-danger {
+            background-color: #ffffff;
+            color: #ef4444;
+            border: 1px solid #fee2e2;
+            transition: all 0.2s;
+        }
+        .btn-danger:hover { background-color: #fef2f2; border-color: #fca5a5; }
+        
+        /* 輸入框樣式 */
+        input { 
+            border: 1px solid #e9e5ff; 
+            padding: 12px 16px; 
+            border-radius: 14px; 
+            outline: none; 
+            width: 100%; 
+            transition: all 0.2s; 
+            background-color: #ffffff;
+        }
+        input:focus { 
+            border-color: #a78bfa; 
+            box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
+        }
+        
+        /* 動畫 */
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .hidden { display: none !important; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col no-scrollbar">
+
+    <!-- 1. 登入介面 (Auth Screen) -->
+    <div id="auth-screen" class="flex-1 flex items-center justify-center p-6 animate-fade-in">
+        <div class="bg-white p-10 rounded-[2.5rem] w-full max-w-md deep-shadow text-center border border-violet-50">
+            <div class="w-20 h-20 bg-violet-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <svg class="w-10 h-10 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-black text-violet-900 mb-2">陳大粒的記帳本</h2>
+            <p class="text-violet-400 text-sm mb-8 font-medium">請輸入代碼</p>
+            
+            <div class="space-y-4">
+                <input type="text" id="access-code-input" placeholder="" class="text-center tracking-normal text-lg font-bold" autocomplete="off">
+                <button onclick="handleLogin()" class="w-full btn-violet py-4 rounded-2xl font-bold text-lg shadow-lg shadow-violet-100">
+                    進入
+                </button>
+            </div>
+            <p id="auth-error" class="text-red-400 text-xs mt-4 font-bold hidden">格式錯誤：僅限使用英文與數字</p>
+        </div>
+    </div>
+
+    <!-- 2. 主程式介面 (App Screen) -->
+    <div id="app-screen" class="hidden flex-1 p-4 md:p-10">
+        
+        <!-- 刪除確認彈窗 (Custom Modal) -->
+        <div id="delete-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm">
+            <div class="bg-white p-8 rounded-3xl max-w-sm w-full deep-shadow border border-violet-50">
+                <h3 class="text-xl font-bold mb-2 text-violet-900">確認刪除</h3>
+                <p class="mb-6 text-slate-500 text-sm">將永久刪除此筆紀錄，確定要刪除嗎？</p>
+                <div class="flex gap-3">
+                    <button onclick="closeDeleteModal()" class="flex-1 py-3 font-medium text-slate-400 hover:bg-slate-50 rounded-xl transition">取消</button>
+                    <button id="final-delete-btn" class="flex-1 py-3 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-700 transition shadow-md">確定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 登出確認彈窗 (Custom Modal) -->
+        <div id="logout-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-sm">
+            <div class="bg-white p-8 rounded-3xl max-w-sm w-full deep-shadow border border-violet-50">
+                <h3 class="text-xl font-bold mb-2 text-violet-900">登出帳本</h3>
+                <p class="mb-6 text-slate-500 text-sm">確定要登出嗎？下次進入需重新輸入代碼。</p>
+                <div class="flex gap-3">
+                    <button onclick="closeLogoutModal()" class="flex-1 py-3 font-medium text-slate-400 hover:bg-slate-50 rounded-xl transition">取消</button>
+                    <button id="final-logout-btn" class="flex-1 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition shadow-md">確定</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-6xl mx-auto">
+            <!-- 頁首標題與總額 -->
+            <header class="flex flex-col md:flex-row justify-between items-center mb-10 px-4 animate-fade-in">
+                <div class="text-center md:text-left">
+                    <div class="flex flex-col md:flex-row md:items-center gap-3 mb-2">
+                        <h1 class="text-3xl font-black text-violet-900 tracking-tight">個人理財管家</h1>
+                        <span class="inline-flex items-center text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg border border-emerald-100 font-bold">
+                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2V7a5 5 0 00-5-5zM7 7a3 3 0 116 0v2H7V7z"></path></svg>
+                            
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-center md:justify-start gap-3 mt-1">
+                        <p class="text-violet-400 font-medium text-sm">目前帳本：<span id="display-code" class="font-bold text-violet-600">----</span></p>
+                        <button onclick="openLogoutModal()" class="btn-danger text-[10px] px-3 py-1 rounded-full font-bold shadow-sm">登出帳本</button>
+                    </div>
+                </div>
+                <div class="mt-6 md:mt-0 text-center md:text-right">
+                    <div class="text-[10px] font-bold uppercase tracking-widest text-violet-300 mb-1">本月累計支出</div>
+                    <div class="text-5xl font-black text-violet-600 tabular-nums" id="monthly-total">$ 0</div>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- 左側：輸入區域 -->
+                <div class="lg:col-span-4 animate-fade-in" style="animation-delay: 0.1s;">
+                    <div class="p-8 rounded-3xl bg-white clean-shadow lg:sticky lg:top-10 border border-violet-50">
+                        <h2 class="text-lg font-bold mb-6 text-violet-800 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                            新增消費紀錄
+                        </h2>
+                        
+                        <div class="space-y-5">
+                            <div>
+                                <label class="block text-xs font-bold text-violet-300 uppercase mb-2 ml-1">支出項目</label>
+                                <input type="text" id="item-name" placeholder="">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-violet-300 uppercase mb-2 ml-1">金額</label>
+                                <input type="text" id="item-amount" placeholder="0" oninput="formatInputAmount(this)">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-violet-300 uppercase mb-2 ml-1">消費類別</label>
+                                <div class="grid grid-cols-5 gap-2">
+                                    <button onclick="setCategory('食')" class="cat-btn btn-outline py-2.5 font-bold rounded-xl btn-active" data-cat="食">食</button>
+                                    <button onclick="setCategory('衣')" class="cat-btn btn-outline py-2.5 font-bold rounded-xl" data-cat="衣">衣</button>
+                                    <button onclick="setCategory('住')" class="cat-btn btn-outline py-2.5 font-bold rounded-xl" data-cat="住">住</button>
+                                    <button onclick="setCategory('行')" class="cat-btn btn-outline py-2.5 font-bold rounded-xl" data-cat="行">行</button>
+                                    <button onclick="setCategory('樂')" class="cat-btn btn-outline py-2.5 font-bold rounded-xl" data-cat="樂">樂</button>
+                                </div>
+                            </div>
+                            <button onclick="addRecord()" class="w-full btn-violet py-4 rounded-2xl font-bold text-base mt-4 shadow-lg shadow-violet-100 transition-all active:scale-95">
+                                新增
+                            </button>
+                        </div>
+
+                        <!-- 分類統計區 -->
+                        <div class="mt-10 pt-8 border-t border-violet-50">
+                            <h3 class="text-xs font-bold text-violet-300 uppercase mb-6 tracking-widest text-center">本月各類支出分佈</h3>
+                            <div class="space-y-4" id="category-totals">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium flex items-center text-violet-700"><span class="w-1.5 h-4 bg-violet-200 rounded-full mr-2"></span>食</span>
+                                    <span id="cat-food" class="font-bold text-lg text-violet-900 tabular-nums">$ 0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium flex items-center text-violet-700"><span class="w-1.5 h-4 bg-violet-200 rounded-full mr-2"></span>衣</span>
+                                    <span id="cat-cloth" class="font-bold text-lg text-violet-900 tabular-nums">$ 0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium flex items-center text-violet-700"><span class="w-1.5 h-4 bg-violet-200 rounded-full mr-2"></span>住</span>
+                                    <span id="cat-home" class="font-bold text-lg text-violet-900 tabular-nums">$ 0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium flex items-center text-violet-700"><span class="w-1.5 h-4 bg-violet-200 rounded-full mr-2"></span>行</span>
+                                    <span id="cat-trans" class="font-bold text-lg text-violet-900 tabular-nums">$ 0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium flex items-center text-violet-700"><span class="w-1.5 h-4 bg-violet-200 rounded-full mr-2"></span>樂</span>
+                                    <span id="cat-play" class="font-bold text-lg text-violet-900 tabular-nums">$ 0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：清單區域 -->
+                <div class="lg:col-span-8 animate-fade-in" style="animation-delay: 0.2s;">
+                    <div class="flex justify-between items-center mb-6 px-2">
+                        <h2 class="text-xl font-bold text-violet-900">歷史消費紀錄</h2>
+                        <span class="text-[10px] text-violet-400 font-bold uppercase tracking-widest">即時同步</span>
+                    </div>
+                    <div id="list-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- 預設載入狀態 -->
+                        <div class="col-span-full flex flex-col items-center justify-center py-32 bg-white rounded-3xl border border-violet-50">
+                            <div class="w-8 h-8 border-2 border-violet-100 border-t-violet-500 rounded-full animate-spin mb-3"></div>
+                            <div class="text-violet-300 font-bold text-[10px] uppercase">正在開啟安全通道...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 訊息提示 -->
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-violet-900 text-white px-8 py-2.5 rounded-full font-bold text-sm shadow-xl opacity-0 transition-all duration-300 pointer-events-none z-[100]">
+        已成功儲存
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Firebase 配置 (專案: dalicost)
+        const firebaseConfig = {
+            apiKey: "AIzaSyActtwOil7T7SHWgQYAibnOq9S75eNMMnI",
+            authDomain: "dalicost.firebaseapp.com",
+            projectId: "dalicost",
+            storageBucket: "dalicost.firebasestorage.app",
+            messagingSenderId: "596373129297",
+            appId: "1:596373129297:web:e641ddb62e4d6c225a5070"
+        };
+        
+        const baseAppId = "dalicost-v2"; // 用於隔離資料路徑
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentUser = null;
+        let selectedCategory = '食';
+        let pendingDeleteId = null;
+        let activeCode = '';
+        let unsubscribeData = null;
+
+        // --- 加解密邏輯 (E2E) ---
+        const cryptoHelper = {
+            encrypt: (text, key) => {
+                try {
+                    if (!text || !key) return "";
+                    const textChars = String(text).split('');
+                    const keyChars = String(key).split('');
+                    const result = textChars.map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ keyChars[i % keyChars.length].charCodeAt(0))).join('');
+                    return btoa(encodeURIComponent(result));
+                } catch (e) { return ""; }
+            },
+            decrypt: (encodedText, key) => {
+                if (!encodedText || !key) return "";
+                try {
+                    const decoded = atob(encodedText);
+                    const resultText = decodeURIComponent(decoded);
+                    const textChars = resultText.split('');
+                    const keyChars = String(key).split('');
+                    return textChars.map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ keyChars[i % keyChars.length].charCodeAt(0))).join('');
+                } catch (e) { return "[解密失敗]"; }
+            }
+        };
+
+        // 登入處理
+        window.handleLogin = () => {
+            const input = document.getElementById('access-code-input').value.trim();
+            const errorEl = document.getElementById('auth-error');
+            
+            if (!input) {
+                errorEl.innerText = "請輸入代碼！";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            // 僅限英文與數字
+            if (!(/^[a-zA-Z0-9]+$/).test(input)) {
+                errorEl.innerText = "格式錯誤：僅限使用英文與數字";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            errorEl.classList.add('hidden');
+            activeCode = input;
+            showApp();
+        };
+
+        // 登出流程 (修正後使用 Custom Modal)
+        window.openLogoutModal = () => document.getElementById('logout-modal').classList.remove('hidden');
+        window.closeLogoutModal = () => document.getElementById('logout-modal').classList.add('hidden');
+
+        document.getElementById('final-logout-btn').onclick = () => {
+            if (unsubscribeData) {
+                unsubscribeData();
+                unsubscribeData = null;
+            }
+            activeCode = '';
+            resetUI();
+            document.getElementById('access-code-input').value = '';
+            document.getElementById('logout-modal').classList.add('hidden');
+            document.getElementById('app-screen').classList.add('hidden');
+            document.getElementById('auth-screen').classList.remove('hidden');
+            showToast("資料已安全登出並鎖定");
+        };
+
+        function resetUI() {
+            document.getElementById('monthly-total').innerText = '$ 0';
+            ['food', 'cloth', 'home', 'trans', 'play'].forEach(id => {
+                const el = document.getElementById(`cat-${id}`);
+                if (el) el.innerText = '$ 0';
+            });
+            document.getElementById('list-container').innerHTML = '';
+        }
+
+        function showApp() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app-screen').classList.remove('hidden');
+            document.getElementById('display-code').innerText = activeCode;
+            
+            // 執行身分驗證
+            if (!currentUser) {
+                signInAnonymously(auth).catch(err => console.error("Auth:", err));
+            } else {
+                listenToData();
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                if (activeCode) listenToData();
+            }
+        });
+
+        // 監聽並解密數據
+        function listenToData() {
+            if (!currentUser || !activeCode) return;
+            if (unsubscribeData) unsubscribeData();
+
+            // 數據隔離路徑
+            const uniquePath = `${baseAppId}_${activeCode}`;
+            const collectionRef = collection(db, 'artifacts', uniquePath, 'public', 'data', 'expenses');
+            
+            unsubscribeData = onSnapshot(collectionRef, (snapshot) => {
+                const records = [];
+                snapshot.forEach(docSnap => {
+                    try {
+                        const data = docSnap.data();
+                        const decryptedName = cryptoHelper.decrypt(data.name, activeCode);
+                        const decryptedAmount = cryptoHelper.decrypt(data.amount, activeCode);
+                        records.push({ 
+                            id: docSnap.id, 
+                            ...data, 
+                            name: decryptedName, 
+                            amount: Number(decryptedAmount) || 0 
+                        });
+                    } catch (e) { console.warn("Record skip due to decryption error"); }
+                });
+                
+                // 按日期排序
+                records.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                renderUI(records.slice(0, 50));
+            }, (error) => {
+                if (error.code !== 'permission-denied') console.error("Firestore:", error);
+            });
+        }
+
+        window.renderUI = (records) => {
+            const list = document.getElementById('list-container');
+            let tM = 0;
+            let cats = { '食': 0, '衣': 0, '住': 0, '行': 0, '樂': 0 };
+            const now = new Date();
+
+            list.innerHTML = records.length ? '' : `
+                <div class="col-span-full text-center py-20 bg-white rounded-3xl border border-violet-50 text-violet-300">
+                    目前尚無記帳紀錄，快來記第一筆吧！
+                </div>`;
+            
+            records.forEach(rec => {
+                const amt = rec.amount;
+                const d = rec.createdAt ? rec.createdAt.toDate() : new Date();
+                
+                if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+                    tM += amt;
+                    if (cats.hasOwnProperty(rec.category)) cats[rec.category] += amt;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'flex items-center justify-between p-5 bg-white rounded-2xl border border-violet-50 clean-shadow animate-fade-in hover:border-violet-200 transition-all group';
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="min-w-[42px] h-[42px] rounded-xl bg-violet-50 text-violet-500 flex items-center justify-center font-bold text-sm border border-violet-100">${rec.category}</div>
+                        <div>
+                            <div class="font-bold text-violet-900 text-sm truncate max-w-[120px]">${rec.name}</div>
+                            <div class="text-[10px] text-violet-300 font-medium tabular-nums">${d.toLocaleDateString()}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 ml-2">
+                        <div class="text-xl font-bold text-violet-600 tabular-nums">$${amt.toLocaleString()}</div>
+                        <button class="del-btn text-slate-200 hover:text-red-400 p-1 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        </button>
+                    </div>`;
+                
+                card.querySelector('.del-btn').onclick = () => {
+                    pendingDeleteId = rec.id;
+                    document.getElementById('delete-modal').classList.remove('hidden');
+                };
+                list.appendChild(card);
+            });
+
+            document.getElementById('monthly-total').innerText = `$ ${tM.toLocaleString()}`;
+            const idMap = { '食': 'cat-food', '衣': 'cat-cloth', '住': 'cat-home', '行': 'cat-trans', '樂': 'cat-play' };
+            Object.keys(idMap).forEach(k => {
+                const el = document.getElementById(idMap[k]);
+                if (el) el.innerText = `$ ${cats[k].toLocaleString()}`;
+            });
+        }
+
+        window.formatInputAmount = (input) => {
+            let value = input.value.replace(/[^0-9]/g, '');
+            input.value = value !== '' ? Number(value).toLocaleString() : '';
+        };
+
+        window.setCategory = (cat) => {
+            selectedCategory = cat;
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.classList.toggle('btn-active', btn.getAttribute('data-cat') === cat);
+            });
+        };
+
+        window.addRecord = async () => {
+            if (!currentUser || !activeCode) return;
+            const nameInput = document.getElementById('item-name');
+            const amountInput = document.getElementById('item-amount');
+            const n = nameInput.value.trim() || `${selectedCategory}`;
+            const aStr = amountInput.value.replace(/,/g, '');
+            
+            if (!aStr || Number(aStr) <= 0) {
+                showToast("❌ 請輸入正確金額");
+                return;
+            }
+            
+            try {
+                // 加密處理
+                const encryptedName = cryptoHelper.encrypt(n, activeCode);
+                const encryptedAmount = cryptoHelper.encrypt(aStr, activeCode);
+
+                const uniquePath = `${baseAppId}_${activeCode}`;
+                const collectionRef = collection(db, 'artifacts', uniquePath, 'public', 'data', 'expenses');
+                await addDoc(collectionRef, { 
+                    name: encryptedName, 
+                    amount: encryptedAmount, 
+                    category: selectedCategory, 
+                    createdAt: serverTimestamp(), 
+                    uid: currentUser.uid 
+                });
+                
+                nameInput.value = ''; 
+                amountInput.value = '';
+                showToast("✅ 加密紀錄成功");
+            } catch (e) { 
+                console.error(e);
+                showToast("❌ 儲存失敗");
+            }
+        };
+
+        window.closeDeleteModal = () => document.getElementById('delete-modal').classList.add('hidden');
+        
+        document.getElementById('final-delete-btn').onclick = async () => {
+            if (pendingDeleteId && currentUser && activeCode) {
+                try {
+                    const uniquePath = `${baseAppId}_${activeCode}`;
+                    await deleteDoc(doc(db, 'artifacts', uniquePath, 'public', 'data', 'expenses', pendingDeleteId));
+                    window.closeDeleteModal();
+                    showToast("🗑️ 紀錄已移除");
+                } catch (e) { console.error(e); }
+            }
+        };
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(-50%) translateY(-10px)';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(-50%) translateY(0)';
+            }, 2500);
+        }
+    </script>
+</body>
+</html>
